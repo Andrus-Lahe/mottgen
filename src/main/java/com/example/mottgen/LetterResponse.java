@@ -1,4 +1,6 @@
 package com.example.mottgen;
 
-public record LetterResponse(String letter) {
+import java.util.List;
+
+public record LetterResponse(String letter, List<String> matches, List<String> gaps) {
 }

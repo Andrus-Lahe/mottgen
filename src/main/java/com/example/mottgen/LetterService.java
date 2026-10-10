@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -36,16 +37,24 @@ public class LetterService {
 			- Kui töökuulutuse tekst ei sisalda tegelikku töökuulutust (nt veateade, sisselogimisleht),
 			  kirjuta "letter" väljale ainult: "Töökuulutuse sisu ei õnnestunud lugeda. Kontrolli linki."
 
-			Väljund (JSON):
-			- "reasoning": 1-3 lauset: millised kuulutuse nõuded ja CV tugevused sa valisid ja miks.
-			- "letter": valmis kiri.
+			Väljund (JSON). Täida väljad selles järjekorras, iga samm toetub eelmisele:
+			- "requirements": kuulutuse 3-5 kõige olulisemat nõuet (lühikesed laused).
+			- "matches": iga nõude kohta, mille kohta on CV-s tõend, üks rida kujul "nõue – tõend CV-st".
+			  Tõend peab olema CV-s olemas, ära oleta.
+			- "gaps": nõuded, mille kohta CV-s tõendit pole (tühi list, kui puudusi pole).
+			  Neid ei tohi kirjas väita.
+			- "letter": valmis kiri. Enne kirjutamist kontrolli, et iga kirja väide on "matches" real
+			  toetatud ja ükski "gaps" nõue pole kirjas kandidaadi omaks tehtud.
+			- Kui töökuulutuse sisu ei õnnestunud lugeda, jäta kolm esimest listi tühjaks.
 
 			Näide:
-			<job_posting>Java arendaja, Näidis OÜ. Nõuded: Spring Boot, SQL, meeskonnatöö.</job_posting>
+			<job_posting>Java arendaja, Näidis OÜ. Nõuded: Spring Boot, SQL, meeskonnatöö, Kubernetes.</job_posting>
 			<cv>Mari Maasikas. 2 aastat Spring Boot arendajana, PostgreSQL, Scrum meeskonnas.</cv>
 			Vastus: {
-			  "reasoning": "Kuulutus nõuab Spring Booti ja SQL-i; CV-s on mõlemad olemas, lisaks meeskonnakogemus Scrumis.",
-			  "letter": "Lugupeetud Näidis OÜ värbaja\\n\\nKandideerin Java arendaja ametikohale. ...\\n\\nLugupidamisega\\nMari Maasikas"
+			  "requirements": ["Spring Boot", "SQL", "meeskonnatöö", "Kubernetes"],
+			  "matches": ["Spring Boot – 2 aastat Spring Boot arendajana", "SQL – PostgreSQL kogemus", "meeskonnatöö – töö Scrumi meeskonnas"],
+			  "gaps": ["Kubernetes – CV-s puudub"],
+			  "letter": "Lugupeetud Näidis OÜ värbaja\\n\\nKandideerin Java arendaja ametikohale. Olen kaks aastat arendanud Spring Booti rakendusi ja töötanud PostgreSQL-iga. ...\\n\\nLugupidamisega\\nMari Maasikas"
 			}
 			""";
 
@@ -82,13 +91,15 @@ public class LetterService {
 	}
 
 	// Teenuse peamine töövoog: valideerib CV, tõmbab töökuulutuse teksti
-	// ja küsib mudelilt kirja. Tagastab ainult valmis kirja,
-	// reasoning väli jääb kasutajale nägemata.
+	// ja küsib mudelilt kirja. Tagastab kirja koos analüüsiga (vasted ja puudujäägid),
+	// et kasutaja näeks, millele kiri toetub.
 	public LetterResponse createLetter(LetterRequest request) {
 		String cv = redactor.redact(validateCv(request.cvText()));
 		String jobText = fetcher.fetchText(request.jobUrl());
 		MotivationLetter result = askModel(jobText, cv, conversationIdOf(request), temperatureOf(request));
-		return new LetterResponse(result.letter());
+		return new LetterResponse(result.letter(),
+				result.matches() == null ? List.of() : result.matches(),
+				result.gaps() == null ? List.of() : result.gaps());
 	}
 
 	// Kontrollib, et CV poleks tühi ega ületaks lubatud pikkust.
