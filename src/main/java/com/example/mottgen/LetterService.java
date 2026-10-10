@@ -7,6 +7,7 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
+// import org.springframework.ai.google.genai.common.GoogleGenAiThinkingLevel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,7 @@ public class LetterService {
 	private final JobPostingFetcher fetcher;
 	private final PersonalDataRedactor redactor;
 	private final int maxCvChars;
+	// private final GoogleGenAiThinkingLevel thinkingLevel;
 
 	// Ehitab ChatClient'i süsteemiprompti ja advisoritega (logimine, vestlusmälu,
 	// mõõdikud). Lisaks salvestab töökuulutuse laadija ja CV maksimumpikkuse
@@ -63,7 +65,9 @@ public class LetterService {
 						 ChatMemory chatMemory,
 						 JobPostingFetcher fetcher,
 						 PersonalDataRedactor redactor,
-						 @Value("${mottgen.cv.max-chars}") int maxCvChars) {
+						 @Value("${mottgen.cv.max-chars}") int maxCvChars
+						 // , @Value("${mottgen.thinking-level}") GoogleGenAiThinkingLevel thinkingLevel
+						 ) {
 		this.chat = builder
 				.defaultSystem(SYSTEM_PROMPT)
 				.defaultAdvisors(
@@ -74,6 +78,7 @@ public class LetterService {
 		this.fetcher = fetcher;
 		this.redactor = redactor;
 		this.maxCvChars = maxCvChars;
+		// this.thinkingLevel = thinkingLevel;
 	}
 
 	// Teenuse peamine töövoog: valideerib CV, tõmbab töökuulutuse teksti
@@ -123,10 +128,12 @@ public class LetterService {
 	// BAD_GATEWAY veaks, et kasutaja ei näeks tehnilisi detaile.
 	private MotivationLetter askModel(String jobText, String cv, String conversationId, Double temperature) {
 		try {
-			ChatClient.ChatClientRequestSpec prompt = chat.prompt();
+			// Thinking level on välja kommenteeritud; temperature seatakse ainult siis, kui kasutaja slider selle saatis.
+			GoogleGenAiChatOptions.Builder options = GoogleGenAiChatOptions.builder(); // .thinkingLevel(thinkingLevel)
 			if (temperature != null) {
-				prompt = prompt.options(GoogleGenAiChatOptions.builder().temperature(temperature));
+				options.temperature(temperature);
 			}
+			ChatClient.ChatClientRequestSpec prompt = chat.prompt().options(options);
 			ResponseEntity<ChatResponse, MotivationLetter> response = prompt
 					.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
 					.user("""
