@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="et" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motivatsioon</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --border: #d6d9de;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --output-bg: #f9fafb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171a; --card: #1e2125; --text: #e6e8eb; --muted: #9aa1ab;
+      --border: #343a42; --accent: #3b82f6; --accent-hover: #60a5fa; --output-bg: #191c20;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  main { max-width: 820px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { margin: 0 0 4px; font-size: 2rem; }
+  .sub { margin: 0 0 24px; color: var(--muted); }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; margin-bottom: 16px;
+  }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .hint { font-weight: 400; color: var(--muted); font-size: 0.875rem; }
+  input[type="url"], textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--card); color: var(--text); font: inherit; padding: 10px 12px;
+  }
+  input[type="url"]:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  textarea { height: 260px; resize: vertical; }
+  .privacy { margin: 8px 0 0; }
+  .actions { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+  .btn {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    padding: 10px 20px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .btn:disabled { opacity: .6; cursor: wait; }
+  .error { color: #dc2626; margin: 0 0 12px; text-align: right; min-height: 1.2em; }
+  .btn:hover { background: var(--accent-hover); }
+  .output-wrap { position: relative; }
+  .output {
+    height: 260px; overflow-y: auto; white-space: pre-wrap;
+    background: var(--output-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 44px 12px 12px; color: var(--text);
+  }
+  .copy {
+    position: absolute; top: 8px; right: 8px; width: 30px; height: 30px;
+    display: grid; place-items: center; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--card); color: var(--muted); cursor: pointer;
+  }
+  .copy:hover { color: var(--accent); border-color: var(--accent); }
+  .copy svg { width: 16px; height: 16px; }
+  .temp-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .temp-row label { margin: 0; white-space: nowrap; }
+  .temp-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .temp-val { min-width: 2.5em; text-align: right; font-variant-numeric: tabular-nums; }
+  .toast {
+    position: absolute; top: 10px; right: 44px; font-size: 0.8rem;
+    background: var(--text); color: var(--card); padding: 2px 8px; border-radius: 4px;
+    opacity: 0; transition: opacity .2s;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Motivatsioon</h1>
+  <p class="sub">Sisesta töökuulutuse link ja oma CV – AI koostab sulle motivatsioonikirja.</p>
+
+  <div class="card">
+    <label for="url">Töökuulutuse link</label>
+    <input id="url" type="url" placeholder="https://www.cv.ee/et/vacancy/...">
+  </div>
+
+  <div class="card">
+    <label for="cv">CV ja lisatekst <span class="hint">– kogemus, oskused, mida soovid rõhutada</span></label>
+    <textarea id="cv" placeholder="Kleebi siia oma CV ja soovi korral lisainfo..."></textarea>
+    <p class="hint privacy">E-post, telefoninumber ja isikukood eemaldatakse enne AI-le saatmist. Nimi ja muud andmed (nt aadress, lingid) jäävad tekstis alles ja lähevad AI-le, jäta need soovi korral ise välja.</p>
+  </div>
+
+  <p class="error" id="error" role="alert"></p>
+  <div class="actions">
+    <button class="btn" id="generate">Koosta motivatsioonikiri</button>
+  </div>
+
+  <div class="card">
+    <label>Motivatsioonikiri</label>
+    <div class="temp-row">
+      <label for="temp">Temperatuur <span class="hint">– väiksem: täpsem, suurem: loovam</span></label>
+      <input id="temp" type="range" min="0.5" max="2" step="0.1" value="0.6">
+      <span class="temp-val" id="tempVal">0,6</span>
+    </div>
+    <div class="output-wrap">
+      <div class="output" id="output">Siia ilmub AI poolt koostatud kiri.</div>
+      <button class="copy" id="copy" title="Kopeeri tekst" aria-label="Kopeeri tekst">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+      <span class="toast" id="toast">Kopeeritud!</span>
+    </div>
+  </div>
+</main>
+
+<script>
+  const out = document.getElementById('output');
+  const toast = document.getElementById('toast');
+  const btn = document.getElementById('generate');
+  const errorEl = document.getElementById('error');
+
+  const tempEl = document.getElementById('temp');
+  const tempVal = document.getElementById('tempVal');
+  tempEl.addEventListener('input', () => {
+    tempVal.textContent = Number(tempEl.value).toFixed(1).replace('.', ',');
+  });
+
+  let conversationId;
+  try {
+    conversationId = sessionStorage.getItem('cid') || crypto.randomUUID();
+    sessionStorage.setItem('cid', conversationId);
+  } catch (_) { conversationId = crypto.randomUUID(); }
+
+  document.getElementById('copy').addEventListener('click', async () => {
+    const text = out.innerText;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+    }
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1200);
+  });
+
+  btn.addEventListener('click', async () => {
+    errorEl.textContent = '';
+    btn.disabled = true;
+    out.innerText = 'Koostan kirja...';
+    try {
+      const res = await fetch('/api/letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobUrl: document.getElementById('url').value,
+          cvText: document.getElementById('cv').value,
+          conversationId,
+          temperature: parseFloat(tempEl.value)
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Midagi läks valesti. Proovi uuesti.');
+      out.innerText = data.letter;
+    } catch (e) {
+      out.innerText = '';
+      errorEl.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
