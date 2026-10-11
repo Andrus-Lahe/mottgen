@@ -31,8 +31,13 @@ class PersonalDataRedactorTest {
 	}
 
 	@Test
-	void keepsInvalidPersonalIdChecksum() {
-		assertEquals("37605030298", redactor.redact("37605030298"));
+	void redactsPersonalIdEvenWithWrongChecksum() {
+		assertEquals("[ISIKUKOOD]", redactor.redact("37605030298"));
+	}
+
+	@Test
+	void doesNotTouchElevenDigitsStartingWithSevenToNine() {
+		assertEquals("78605030298", redactor.redact("78605030298"));
 	}
 
 	@Test
