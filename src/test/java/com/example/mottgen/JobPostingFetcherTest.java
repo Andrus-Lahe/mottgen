@@ -123,4 +123,13 @@ class JobPostingFetcherTest {
 		assertFalse(fetcher.hasEmptyJobDescription(withLong));
 		assertFalse(fetcher.hasEmptyJobDescription(Jsoup.parse("<body>tavaline leht</body>")));
 	}
+
+	// Kontrollib, et väga pikk kirjeldus (koos \" jada ja reavahetustega) ei kutsu esile StackOverflowError'it.
+	@Test
+	void handlesVeryLongDescriptionWithoutStackOverflow() {
+		String longText = "Tööülesanne \\\"x\\\" \\n ".repeat(20000);
+		Document doc = Jsoup.parse("<script type='application/ld+json'>{\"@type\":\"JobPosting\","
+				+ "\"description\":\"" + longText + "\"}</script><body>x</body>");
+		assertFalse(fetcher.hasEmptyJobDescription(doc));
+	}
 }

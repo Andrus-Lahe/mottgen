@@ -33,9 +33,10 @@ public class JobPostingFetcher {
 	// Alla selle pikkuse loetakse kuulutuse kirjeldus (või kogu leht) puuduvaks.
 	private static final int MIN_DESCRIPTION_CHARS = 200;
 	private static final int MIN_PAGE_CHARS = 100;
-	// Leiab JSON-LD plokist JobPosting'u kirjelduse välja.
+	// Leiab JSON-LD plokist JobPosting'u kirjelduse välja. Possessiivne kvantor väldib
+	// pikal tekstil StackOverflowError'it, mida tavaline (?:a|b)* muster põhjustaks.
 	private static final Pattern JOB_DESCRIPTION = Pattern.compile(
-			"\"@type\"\\s*:\\s*\"JobPosting\".*?\"description\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"", Pattern.DOTALL);
+			"\"@type\"\\s*:\\s*\"JobPosting\".*?\"description\"\\s*:\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\"", Pattern.DOTALL);
 
 	private final int maxChars;
 	private final int timeoutMs;
