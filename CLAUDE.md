@@ -28,7 +28,7 @@ Töötab päris kuulutusega (kontrollitud). Repo: https://github.com/Andrus-Lahe
 - `LetterService` – süsteemiprompt + few-shot, CV valideerimine ja isikuandmete eemaldamine, mudelikutse, temperature, conversationId
 - `JobPostingFetcher` – kuulutuse tekst Jsoupiga + ettevõtte "meist" lehtede info (max 3 lehte, 2500 märki; LinkedIn/Facebook jms ignoreeritud); SSRF-kaitse (`rejectInternalHost`)
   Kui kuulutuse teksti lehelt ei leita (JSON-LD `JobPosting` kirjeldus < 200 märki, nt kuulutus on pildina, või leht < 100 märki), viskab 422 vea enne mudelikutset.
-- `PersonalDataRedactor` – e-post, telefon, isikukood (kontrollsummaga) -> `[E-POST]`, `[TELEFON]`, `[ISIKUKOOD]`
+- `PersonalDataRedactor` – e-post, telefon, isikukood (11 numbrit, algab 1–6-ga, kontrollsummat ei kontrollita) -> `[E-POST]`, `[TELEFON]`, `[ISIKUKOOD]`
 - `LetterMetricsAdvisor` – oma advisor, logib tokenid jms
 - `LetterRequest(jobUrl, cvText, conversationId, temperature)`, `LetterResponse`, `MotivationLetter` (`reasoning` enne `letter`) – recordid
 - Testid: `JobPostingFetcherTest` (sh ettevõtte info leidmine), `PersonalDataRedactorTest`
