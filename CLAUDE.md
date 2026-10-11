@@ -27,6 +27,7 @@ Töötab päris kuulutusega (kontrollitud). Repo: https://github.com/Andrus-Lahe
 - `LetterController` – `GET /` (leht), `POST /api/letter` (JSON), `LetterException` -> `{"error": ...}`
 - `LetterService` – süsteemiprompt + few-shot, CV valideerimine ja isikuandmete eemaldamine, mudelikutse, temperature, conversationId
 - `JobPostingFetcher` – kuulutuse tekst Jsoupiga + ettevõtte "meist" lehtede info (max 3 lehte, 2500 märki; LinkedIn/Facebook jms ignoreeritud); SSRF-kaitse (`rejectInternalHost`)
+  Kui kuulutuse teksti lehelt ei leita (JSON-LD `JobPosting` kirjeldus < 200 märki, nt kuulutus on pildina, või leht < 100 märki), viskab 422 vea enne mudelikutset.
 - `PersonalDataRedactor` – e-post, telefon, isikukood (kontrollsummaga) -> `[E-POST]`, `[TELEFON]`, `[ISIKUKOOD]`
 - `LetterMetricsAdvisor` – oma advisor, logib tokenid jms
 - `LetterRequest(jobUrl, cvText, conversationId, temperature)`, `LetterResponse`, `MotivationLetter` (`reasoning` enne `letter`) – recordid
@@ -38,6 +39,8 @@ Töötab päris kuulutusega (kontrollitud). Repo: https://github.com/Andrus-Lahe
 - **Advisorid:** `SimpleLoggerAdvisor`, `MessageChatMemoryAdvisor` (leht hoiab conversationId sessionStorage'is), `LetterMetricsAdvisor`.
 - **Temperature:** vaikimisi 0.6 (`application.properties`), max tokens 1500. Frontendi slider (0,5–2,0, samm 0,1) saadab väärtuse
   päringus ja kirjutab selle üle ainult selle päringu jaoks; failis olev väärtus ei muutu. Serveripoolne vahemik: `MIN/MAX_TEMPERATURE` `LetterService`'is.
+- **Kuulutus pildina:** CVKeskus.ee kuulutuste tekst on mõnikord pilt (`/gfx/tpl_jobs/...jpg`), HTML-is ainult pealkiri ja palk. Fetcher annab selge veateate
+  ("Kopeeri kuulutuse tekst käsitsi lisatekstiks"). Pildi lugemine Geminiga (multimodaalne sisend) on kaalutud, aga tegemata; mälu kasvaks pildi võrra.
 - **Privaatsus:** isikuandmed (e-post, telefon, isikukood) eemaldatakse CV-st enne Google'i saatmist (kontrollitud võltsserveriga). 
   **Nimi, aadress ja lingid jäävad teksti** ja lähevad Google'ile (nii on kokku lepitud). Vormil on selle kohta märkus CV välja all.
   Eestikeelne lauatelefon, mis algab 1–4 või 9-ga ilma `+372`-ta, jääb märkamata.
@@ -54,5 +57,5 @@ Töötab päris kuulutusega (kontrollitud). Repo: https://github.com/Andrus-Lahe
 
 ## Võimalikud järgmised sammud
 - Kirja kvaliteedi hindamine (ainult CV faktid, pikkus, toon); prompti/temperature'i tuunimine
-- Veaolukorrad: vigane link, tühi CV, sisselogimist nõudev kuulutus
+- Veaolukorrad: vigane link, tühi CV, sisselogimist nõudev kuulutus (pildina kuulutus on tehtud)
 - Gemini otsingu-grounding (kui soovitud)
