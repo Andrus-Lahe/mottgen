@@ -7,8 +7,10 @@ import org.junit.jupiter.api.Test;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JobPostingFetcherTest {
 
@@ -102,5 +104,23 @@ class JobPostingFetcherTest {
 						+ "<a href='/expertise'>d</a><a href='/mission'>e</a>",
 				"https://firma.ee");
 		assertEquals(3, fetcher.findAboutLinks(home, "firma.ee").size());
+	}
+
+	// Kontrollib, et JobPosting koos peaaegu tühja kirjeldusega (kuulutus on pildil) tuvastatakse.
+	@Test
+	void detectsEmptyJobDescription() {
+		Document doc = Jsoup.parse("<script type='application/ld+json'>{\"@graph\":[{\"@type\":\"JobPosting\","
+				+ "\"title\":\"Uurija\",\"description\":\"<p>Uurija Amet</p>\"}]}</script><body>x</body>");
+		assertTrue(fetcher.hasEmptyJobDescription(doc));
+	}
+
+	// Kontrollib, et piisavalt pikk JobPosting'i kirjeldus ega JSON-LD puudumine ei anna valehäiret.
+	@Test
+	void acceptsLongDescriptionOrNoJsonLd() {
+		String longText = "a".repeat(300);
+		Document withLong = Jsoup.parse("<script type='application/ld+json'>{\"@type\":\"JobPosting\","
+				+ "\"description\":\"" + longText + "\"}</script><body>x</body>");
+		assertFalse(fetcher.hasEmptyJobDescription(withLong));
+		assertFalse(fetcher.hasEmptyJobDescription(Jsoup.parse("<body>tavaline leht</body>")));
 	}
 }

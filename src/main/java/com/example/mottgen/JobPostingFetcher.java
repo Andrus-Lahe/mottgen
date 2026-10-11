@@ -15,6 +15,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Grounding: tõmbab töökuulutuse tegeliku teksti, et AI ei peaks ametikohta ise "ära arvama". */
 @Component
@@ -25,9 +27,15 @@ public class JobPostingFetcher {
 			"ekspertiis", "teenused", "about", "mission", "what we do", "expertise", "who we are");
 	// Tööportaalid ja sotsiaalmeedia, mida ettevõtte enda veebiks ei loeta.
 	private static final List<String> IGNORED_HOSTS = List.of("linkedin.", "facebook.", "instagram.", "twitter.",
-			"x.com", "youtube.", "cv.ee", "cvkeskus.", "tootukassa.", "indeed.", "glassdoor.", "google.", "tiktok.");
+			"x.com", "youtube.", "cv.ee", "cvkeskus.", "tootukassa.", "google.", "tiktok.");
 	private static final int MAX_ABOUT_PAGES = 3;
 	private static final int MAX_ABOUT_CHARS = 2500;
+	// Alla selle pikkuse loetakse kuulutuse kirjeldus (või kogu leht) puuduvaks.
+	private static final int MIN_DESCRIPTION_CHARS = 200;
+	private static final int MIN_PAGE_CHARS = 100;
+	// Leiab JSON-LD plokist JobPosting'u kirjelduse välja.
+	private static final Pattern JOB_DESCRIPTION = Pattern.compile(
+			"\"@type\"\\s*:\\s*\"JobPosting\".*?\"description\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"", Pattern.DOTALL);
 
 	private final int maxChars;
 	private final int timeoutMs;
@@ -49,12 +57,32 @@ public class JobPostingFetcher {
 		Document doc = download(uri);
 		// Ettevõtte link tuleb leida enne puhastust, sest see on tihti jaluses või päises.
 		String companyUrl = findCompanyUrl(doc, uri.getHost());
+		// JSON-LD asub skriptis, seega see kontroll tuleb teha enne skriptide eemaldamist.
+		boolean emptyDescription = hasEmptyJobDescription(doc);
 		doc.select("script, style, nav, footer, header, noscript, form").remove();
 		String text = doc.title() + "\n" + doc.body().text();
+		if (emptyDescription || doc.body().text().length() < MIN_PAGE_CHARS) {
+			throw new LetterException(HttpStatus.UNPROCESSABLE_ENTITY,
+					"Lehelt ei leitud kuulutuse teksti (see võib olla pilt või laetakse JavaScriptiga). "
+							+ "Kopeeri kuulutuse tekst käsitsi lisatekstiks.");
+		}
 		if (text.length() > maxChars) {
 			text = text.substring(0, maxChars);
 		}
 		return text + fetchCompanyInfo(companyUrl);
+	}
+
+	// Kontrollib lehe JSON-LD andmeid: kui seal on JobPosting, aga selle kirjeldus on peaaegu tühi,
+	// on kuulutuse tegelik tekst tõenäoliselt pildina. Ilma JobPosting'uta lehel tagastab false.
+	boolean hasEmptyJobDescription(Document doc) {
+		for (var script : doc.select("script[type=application/ld+json]")) {
+			Matcher m = JOB_DESCRIPTION.matcher(script.data());
+			if (m.find()) {
+				String description = m.group(1).replaceAll("<[^>]*>", " ").trim();
+				return description.length() < MIN_DESCRIPTION_CHARS;
+			}
+		}
+		return false;
 	}
 
 	// Otsib kuulutuselt esimese lingi, mis viib teise domeeni kui kuulutus ise ja
