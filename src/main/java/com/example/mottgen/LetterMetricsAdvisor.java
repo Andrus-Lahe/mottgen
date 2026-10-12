@@ -10,16 +10,21 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.core.Ordered;
 
 import java.math.BigDecimal;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Logib iga LLM-kõne tokenid, hinna, latentsuse ja finishReason'i. */
 @Slf4j
 public class LetterMetricsAdvisor implements CallAdvisor {
+
+	// Päringu kontekstivõti, mille all teenus annab advisorile hoidja mõõdikute tagasiandmiseks.
+	public static final String STATS_HOLDER_KEY = "letterStatsHolder";
 
 	private static final BigDecimal INPUT_TOKEN_COST = new BigDecimal("0.30").divide(new BigDecimal(1_000_000));
 	private static final BigDecimal OUTPUT_TOKEN_COST = new BigDecimal("2.50").divide(new BigDecimal(1_000_000));
 
 	// Mähib LLM-kõne ümber: mõõdab kestuse ja loeb vastusest tokenite kasutuse.
 	// Arvutab sisend- ja väljundtokenite hinna ning logib kõik ühe reana.
+	// Mõõdikud pannakse ka päringu kontekstis olevasse hoidjasse, et teenus need lehele edasi annaks.
 	// Vastust ei muuda, see antakse edasi samal kujul.
 	@Override
 	public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
@@ -32,12 +37,21 @@ public class LetterMetricsAdvisor implements CallAdvisor {
 		int in = usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();
 		int out = usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens();
 
-		log.info("[LetterMetrics] llm_call in={} out={} latencyMs={} inputCost={} outputCost={} model={} finishReason={}",
-				in, out, System.currentTimeMillis() - start,
+		LetterStats stats = new LetterStats(in, out, System.currentTimeMillis() - start,
 				INPUT_TOKEN_COST.multiply(new BigDecimal(in)),
 				OUTPUT_TOKEN_COST.multiply(new BigDecimal(out)),
 				chatResponse.getMetadata().getModel(),
-				chatResponse.getResult().getMetadata().getFinishReason());
+				String.valueOf(chatResponse.getResult().getMetadata().getFinishReason()));
+
+		log.info("[LetterMetrics] llm_call in={} out={} latencyMs={} inputCost={} outputCost={} model={} finishReason={}",
+				stats.inputTokens(), stats.outputTokens(), stats.latencyMs(),
+				stats.inputCost(), stats.outputCost(), stats.model(), stats.finishReason());
+
+		if (request.context().get(STATS_HOLDER_KEY) instanceof AtomicReference<?> holder) {
+			@SuppressWarnings("unchecked")
+			AtomicReference<LetterStats> target = (AtomicReference<LetterStats>) holder;
+			target.set(stats);
+		}
 
 		return response;
 	}

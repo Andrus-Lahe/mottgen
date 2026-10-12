@@ -51,6 +51,7 @@
   .btn:disabled { opacity: .6; cursor: wait; }
   .error { color: #dc2626; margin: 0 0 12px; text-align: right; min-height: 1.2em; }
   .btn:hover { background: var(--accent-hover); }
+  .stats { margin: 8px 0 0; font-size: .8rem; color: var(--muted, #6b7280); font-family: ui-monospace, monospace; }
   .output-wrap { position: relative; }
   .output {
     height: 260px; overflow-y: auto; white-space: pre-wrap;
@@ -116,6 +117,7 @@
       </button>
       <span class="toast" id="toast">Kopeeritud!</span>
     </div>
+    <p class="stats" id="stats" hidden></p>
     <details class="analysis" id="analysis" hidden>
       <summary>Kuidas AI sellise kirja koostas</summary>
       <h3>Kuulutuse nõuded, mis CV-ga kattuvad</h3>
@@ -167,11 +169,23 @@
     setTimeout(() => toast.classList.remove('show'), 1200);
   });
 
+  const statsEl = document.getElementById('stats');
+
+  // Kuvab LLM-kõne mõõdikud ühe reana (tokenid, kestus, hind, mudel, lõpu põhjus).
+  function showStats(s) {
+    if (!s) return;
+    const cost = (Number(s.inputCost) + Number(s.outputCost)).toFixed(4).replace('.', ',');
+    const sec = (s.latencyMs / 1000).toFixed(1).replace('.', ',');
+    statsEl.textContent = `sisend ${s.inputTokens} · väljund ${s.outputTokens} · ${sec} s · $${cost} · ${s.model} · ${s.finishReason}`;
+    statsEl.hidden = false;
+  }
+
   btn.addEventListener('click', async () => {
     errorEl.textContent = '';
     btn.disabled = true;
     out.innerText = 'Koostan kirja...';
     analysisEl.hidden = true;
+    statsEl.hidden = true;
     try {
       const res = await fetch('/api/letter', {
         method: 'POST',
@@ -186,6 +200,7 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Midagi läks valesti. Proovi uuesti.');
       out.innerText = data.letter;
+      showStats(data.stats);
       if ((data.matches && data.matches.length) || (data.gaps && data.gaps.length)) {
         fillList('matches', data.matches);
         fillList('gaps', data.gaps);

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class LetterService {
@@ -96,10 +97,12 @@ public class LetterService {
 	public LetterResponse createLetter(LetterRequest request) {
 		String cv = redactor.redact(validateCv(request.cvText()));
 		String jobText = fetcher.fetchText(request.jobUrl());
-		MotivationLetter result = askModel(jobText, cv, conversationIdOf(request), temperatureOf(request));
+		AtomicReference<LetterStats> stats = new AtomicReference<>();
+		MotivationLetter result = askModel(jobText, cv, conversationIdOf(request), temperatureOf(request), stats);
 		return new LetterResponse(result.letter(),
 				result.matches() == null ? List.of() : result.matches(),
-				result.gaps() == null ? List.of() : result.gaps());
+				result.gaps() == null ? List.of() : result.gaps(),
+				stats.get());
 	}
 
 	// Kontrollib, et CV poleks tühi ega ületaks lubatud pikkust.
@@ -137,7 +140,8 @@ public class LetterService {
 	// Saadab mudelile töökuulutuse ja CV ning loeb vastuse struktureeritud kujul.
 	// Kontrollib, et kiri poleks tühi, ja muudab AI tõrked arusaadavaks
 	// BAD_GATEWAY veaks, et kasutaja ei näeks tehnilisi detaile.
-	private MotivationLetter askModel(String jobText, String cv, String conversationId, Double temperature) {
+	private MotivationLetter askModel(String jobText, String cv, String conversationId, Double temperature,
+									 AtomicReference<LetterStats> stats) {
 		try {
 			// Thinking level on välja kommenteeritud; temperature seatakse ainult siis, kui kasutaja slider selle saatis.
 			GoogleGenAiChatOptions.Builder options = GoogleGenAiChatOptions.builder(); // .thinkingLevel(thinkingLevel)
@@ -146,7 +150,8 @@ public class LetterService {
 			}
 			ChatClient.ChatClientRequestSpec prompt = chat.prompt().options(options);
 			ResponseEntity<ChatResponse, MotivationLetter> response = prompt
-					.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
+					.advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId)
+						.param(LetterMetricsAdvisor.STATS_HOLDER_KEY, stats))
 					.user("""
 							<job_posting>
 							%s
